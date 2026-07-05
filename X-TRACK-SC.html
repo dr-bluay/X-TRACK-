@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<!--
+    ================================================================
+    X-TRACK | Intelligence Dashboard
+    ================================================================
+    Author / Rights: Bluay
+      GitHub:  https://github.com/dr-bluay
+      YouTube: https://youtube.com/@bl1uaydino
+    Built with help from Claude, Kimi K2, and other AI tools.
+    See the "Credits & Rights" section in the footer for the
+    on-page version of this notice.
+
+    FILE MAP (search these headers to jump around):
+      <style>
+        1.  Reset & design tokens
+        2.  Layout shell (header + main container)
+        3.  Search section (tabs, inputs, quick actions)
+        4.  Buttons
+        5.  Status / error / loading feedback
+        6.  Results panel
+        7.  Data cards
+        8.  Raw JSON panel
+        9.  Settings modal
+        10. History panel
+        11. External links & info panels
+        12. Footer / credits
+        13. Responsive
+      <body>
+        - Header
+        - Search section (IP / Email / Phone tabs)
+        - Error box / loading indicator
+        - Results panel
+        - History panel
+        - Empty state
+        - Settings modal
+        - Footer (credits & rights)
+      <script>
+        - State & config
+        - Settings: persistence + UI sync
+        - Panel toggles (settings modal, history drawer)
+        - Tab navigation
+        - Status / error / loading feedback
+        - Shared render helper
+        - IP tracker (input helpers + fetch + render)
+        - Email lookup
+        - Phone lookup
+        - History
+        - Result actions (map + copy JSON)
+        - Event listeners
+        - Init
+    ================================================================
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-TRACK | Intelligence Dashboard</title>
+    <style>
+        /* ============================================================
+           1. RESET & DESIGN TOKENS
+           ============================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Surfaces */
+            --bg-primary: #050508;
+            --bg-secondary: #0c0c14;
+            --bg-card: #12121c;
+            --bg-input: #08080f;
+
+            /* Borders */
+            --border: #1a1a2e;
+            --border-hover: #252540;
+
+            /* Text */
+            --text-primary: #d0d0e5;
+            --text-secondary: #7a7a9a;
+            --text-muted: #4a4a6a;
+
+            /* Accent */
+            --accent: #1d4ed8;
+            --accent-hover: #2563eb;
+            --accent-glow: rgba(29, 78, 216, 0.15);
+
+            /* Status */
+            --success: #059669;
+            --danger: #dc2626;
+            --warning: #d97706;
+            --info: #0891b2;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-secondary);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* ============================================================
+           2. LAYOUT SHELL (header + main container)
+           ============================================================ */
+        .app-header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 0 28px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: var(--text-primary);
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent), #1e3a8a);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: white;
+            font-weight: 900;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .icon-btn:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+            background: var(--border-hover);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 28px;
+        }
+
+        /* ============================================================
+           3. SEARCH SECTION (tabs, inputs, quick actions)
+           ============================================================ */
+        .search-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 28px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: var(--bg-primary);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tab:hover {
+            color: var(--text-secondary);
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 2px 8px var(--accent-glow);
+        }
+
+        .search-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .quick-chip {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 7px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .quick-chip:hover {
+            border-color: var(--accent);
+            color: var(--accent-hover);
+            background: var(--accent-glow);
+        }
+
+        /* ============================================================
+           4. BUTTONS (shared across the page)
+           ============================================================ */
+        .btn {
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 2px 12px var(--accent-glow);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-hover);
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        /* ============================================================
+           5. STATUS / ERROR / LOADING FEEDBACK
+           ============================================================ */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 14px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 6px var(--success);
+        }
+
+        .status-dot.error {
+            background: var(--danger);
+            box-shadow: 0 0 6px var(--danger);
+        }
+
+        .status-dot.warn {
+            background: var(--warning);
+            box-shadow: 0 0 6px var(--warning);
+        }
+
+        .loading-overlay {
+            display: none;
+            text-align: center;
+            padding: 60px;
+            color: var(--text-muted);
+        }
+
+        .loading-overlay.active {
+            display: block;
+        }
+
+        .error-box {
+            background: rgba(220, 38, 38, 0.08);
+            border: 1px solid rgba(220, 38, 38, 0.25);
+            color: #fca5a5;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .error-box.active {
+            display: flex;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 100px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-title {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .empty-hint {
+            font-size: 14px;
+        }
+
+        /* ============================================================
+           6. RESULTS PANEL (header badge + section grids)
+           ============================================================ */
+        .results-panel {
+            display: none;
+        }
+
+        .results-panel.active {
+            display: block;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .target-badge {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 12px 24px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        }
+
+        .target-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+        }
+
+        .target-value {
+            font-family: 'Courier New', monospace;
+            font-size: 22px;
+            color: var(--accent-hover);
+            font-weight: 700;
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .section {
+            margin-bottom: 28px;
+        }
+
+        .section-title {
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+            gap: 12px;
+        }
+
+        /* ============================================================
+           7. DATA CARDS (individual result values)
+           ============================================================ */
+        .data-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px;
+            transition: all 0.2s;
+        }
+
+        .data-card:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        }
+
+        .data-label {
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+        }
+
+        .data-value {
+            color: var(--text-primary);
+            font-size: 15px;
+            font-weight: 500;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .data-value.mono { font-family: 'Courier New', monospace; color: var(--accent-hover); }
+        .data-value.success { color: var(--success); }
+        .data-value.danger { color: var(--danger); }
+        .data-value.warn { color: var(--warning); }
+        .data-value.info { color: var(--info); }
+
+        /* ============================================================
+           8. RAW JSON PANEL
+           ============================================================ */
+        .json-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+
+        .json-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .json-title {
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 18px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        .copy-btn.copied {
+            background: var(--success);
+            color: white;
+            border-color: var(--success);
+        }
+
+        pre {
+            color: #9090b0;
+            font-family: 'Courier New', 'Fira Code', monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            background: var(--bg-primary);
+            padding: 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        /* ============================================================
+           9. SETTINGS MODAL
+           ============================================================ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+
+        .modal-header {
+            padding: 22px 26px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            color: var(--text-primary);
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 22px 26px;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 18px 26px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .setting-item {
+            margin-bottom: 24px;
+        }
+
+        .setting-label {
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .setting-desc {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .setting-select {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .setting-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .toggle-row:last-child {
+            border-bottom: none;
+        }
+
+        .toggle-label {
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .toggle-desc {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 46px;
+            height: 26px;
+            background: var(--bg-card);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .toggle-switch.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(20px);
+        }
+
+        /* ============================================================
+           10. HISTORY PANEL
+           ============================================================ */
+        .history-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 24px;
+            display: none;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+
+        .history-panel.active {
+            display: block;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .history-item:hover {
+            border-color: var(--accent);
+            background: var(--bg-input);
+        }
+
+        .history-ip {
+            font-family: 'Courier New', monospace;
+            color: var(--accent-hover);
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .history-time {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .history-type {
+            background: var(--bg-input);
+            color: var(--text-muted);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        /* ============================================================
+           11. EXTERNAL LINKS & INFO PANELS (email / phone tabs)
+           ============================================================ */
+        .external-links {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .ext-link {
+            color: var(--accent-hover);
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            transition: all 0.2s;
+            background: var(--bg-card);
+        }
+
+        .ext-link:hover {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .email-info, .phone-info {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .info-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .info-text strong {
+            color: var(--text-primary);
+        }
+
+        .tool-list {
+            margin-top: 12px;
+            padding-left: 20px;
+        }
+
+        .tool-list li {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        .tool-list a {
+            color: var(--accent-hover);
+            text-decoration: none;
+        }
+
+        .tool-list a:hover {
+            text-decoration: underline;
+        }
+
+        /* ============================================================
+           12. FOOTER / CREDITS & RIGHTS
+           ============================================================ */
+        .app-footer {
+            max-width: 1200px;
+            margin: 8px auto 0;
+            padding: 24px 28px 32px;
+        }
+
+        .credits-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 22px 26px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .credits-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+
+        .credits-text strong {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .credits-links {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* ============================================================
+           13. RESPONSIVE
+           ============================================================ */
+        @media (max-width: 600px) {
+            .header-content { height: 56px; }
+            .logo { font-size: 18px; }
+            .main-container { padding: 16px; }
+            .search-section { padding: 20px; }
+            .grid { grid-template-columns: 1fr; }
+            .tab { font-size: 11px; padding: 8px 10px; }
+            .app-footer { padding: 16px 16px 24px; }
+            .credits-panel { padding: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ================================================================
+         HEADER
+         ================================================================ -->
+    <header class="app-header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">X</div>
+                X-TRACK
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="toggleHistory()" title="History">H</button>
+                <button class="icon-btn" onclick="toggleSettings()" title="Settings">S</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+
+        <!-- ============================================================
+             SEARCH SECTION (tab bar + one panel per lookup type)
+             ============================================================ -->
+        <div class="search-section">
+            <div class="tab-bar">
+                <button class="tab active" onclick="switchTab('ip')" id="tab-ip">IP Tracker</button>
+                <button class="tab" onclick="switchTab('email')" id="tab-email">Email Lookup</button>
+                <button class="tab" onclick="switchTab('phone')" id="tab-phone">Phone Lookup</button>
+            </div>
+
+            <!-- IP Tracker panel -->
+            <div id="panel-ip">
+                <div class="search-row">
+                    <input type="text" class="search-input" id="ip-input" placeholder="Enter IP address (e.g., 8.8.8.8) or domain">
+                    <button class="btn btn-primary" onclick="trackIP()">Track</button>
+                    <button class="btn btn-secondary" onclick="trackMyIP()">My IP</button>
+                </div>
+                <div class="quick-actions">
+                    <span class="quick-chip" onclick="setIP('8.8.8.8')">Google DNS</span>
+                    <span class="quick-chip" onclick="setIP('1.1.1.1')">Cloudflare</span>
+                    <span class="quick-chip" onclick="setIP('208.67.222.222')">OpenDNS</span>
+                    <span class="quick-chip" onclick="setIP('9.9.9.9')">Quad9</span>
+                </div>
+                <div class="external-links">
+                    <a href="https://www.opentracker.net/feature/ip-tracker/" target="_blank" class="ext-link">OpenTracker IP</a>
+                    <a href="https://whatismyipaddress.com/" target="_blank" class="ext-link">WhatIsMyIPAddress</a>
+                </div>
+            </div>
+
+            <!-- Email Lookup panel -->
+            <div id="panel-email" style="display:none;">
+                <div class="search-row">
+                    <input type="text" class="search-input" id="email-input" placeholder="Enter email address (e.g., user@example.com)">
+                    <button class="btn btn-primary" onclick="lookupEmail()">Lookup</button>
+                </div>
+                <div class="email-info">
+                    <div class="info-text">
+                        <strong>Email lookup tools</strong> can help verify if an email address is valid, check if it has been involved in data breaches, or find associated information. X-TRACK provides direct links to trusted external services for email investigation.
+                        <ul class="tool-list">
+                            <li><a href="https://haveibeenpwned.com/" target="_blank">Have I Been Pwned</a> - Check breach history</li>
+                            <li><a href="https://whatismyipaddress.com/trace-email" target="_blank">WhatIsMyIPAddress Email Trace</a> - Trace email headers</li>
+                            <li><a href="https://emailrep.io/" target="_blank">EmailRep</a> - Email reputation check</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phone Lookup panel -->
+            <div id="panel-phone" style="display:none;">
+                <div class="search-row">
+                    <input type="text" class="search-input" id="phone-input" placeholder="Enter phone number (e.g., +1-555-123-4567)">
+                    <button class="btn btn-primary" onclick="lookupPhone()">Lookup</button>
+                </div>
+                <div class="phone-info">
+                    <div class="info-text">
+                        <strong>Phone number lookup</strong> can reveal carrier information, geographic location, and line type. X-TRACK connects you to reliable reverse phone lookup services.
+                        <ul class="tool-list">
+                            <li><a href="https://www.whitepages.com/reverse_phone" target="_blank">Whitepages Reverse Phone</a> - US numbers</li>
+                            <li><a href="https://www.numlookup.com/" target="_blank">NumLookup</a> - Free reverse lookup</li>
+                            <li><a href="https://whatismyipaddress.com/ip-lookup" target="_blank">WhatIsMyIPAddress Tools</a> - Additional IP tools</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-bar">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-text">Ready</span>
+            </div>
+        </div>
+
+        <!-- Feedback: error / loading -->
+        <div class="error-box" id="error-box">
+            <span id="error-msg"></span>
+        </div>
+
+        <div class="loading-overlay" id="loading-box">
+            <div>Looking up data...</div>
+        </div>
+
+        <!-- ============================================================
+             RESULTS PANEL
+             ============================================================ -->
+        <div class="results-panel" id="results-box">
+            <div class="panel-header">
+                <div class="target-badge">
+                    <div>
+                        <div class="target-label">Target</div>
+                        <div class="target-value" id="result-target">-</div>
+                    </div>
+                </div>
+                <div class="panel-actions">
+                    <button class="btn btn-secondary" onclick="openMap()">Map</button>
+                    <button class="btn btn-secondary" onclick="copyJSON()">Copy JSON</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Location</div>
+                <div class="grid" id="location-grid"></div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Network &amp; ISP</div>
+                <div class="grid" id="network-grid"></div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Geography</div>
+                <div class="grid" id="geo-grid"></div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">External Resources</div>
+                <div class="external-links" id="resource-links"></div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Raw JSON Data</div>
+                <div class="json-panel">
+                    <div class="json-header">
+                        <span class="json-title">Full API Response</span>
+                        <button class="copy-btn" id="copy-btn" onclick="copyJSON()">Copy JSON</button>
+                    </div>
+                    <pre id="json-output"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- History panel (toggled from header) -->
+        <div class="history-panel" id="history-panel">
+            <div class="section-title">Recent Lookups</div>
+            <div id="history-list"></div>
+        </div>
+
+        <!-- Empty state, shown until first lookup -->
+        <div class="empty-state" id="empty-state">
+            <div class="empty-title">Enter a target to begin tracking</div>
+            <div class="empty-hint">Switch tabs to lookup IPs, emails, or phone numbers</div>
+        </div>
+    </main>
+
+    <!-- ================================================================
+         FOOTER: CREDITS & RIGHTS
+         ================================================================ -->
+    <footer class="app-footer">
+        <div class="credits-panel">
+            <div class="credits-text">
+                <strong>X-TRACK</strong> &middot; created and maintained by <strong>Bluay</strong><br>
+                Built with the help of Claude, Kimi K2, and other AI tools.
+            </div>
+            <div class="credits-links">
+                <a href="https://github.com/dr-bluay" target="_blank" class="ext-link">GitHub</a>
+                <a href="https://youtube.com/@bl1uaydino" target="_blank" class="ext-link">YouTube</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ================================================================
+         SETTINGS MODAL
+         ================================================================ -->
+    <div class="modal-overlay" id="settings-modal" onclick="closeSettings(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">X-TRACK Settings</div>
+                <button class="modal-close" onclick="toggleSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label class="setting-label">API Provider</label>
+                    <div class="setting-desc">Choose the geolocation service backend. ip-api.com is recommended (no CORS issues, no key needed).</div>
+                    <select class="setting-select" id="setting-api">
+                        <option value="ipapi">ip-api.com (Free, no key, no CORS)</option>
+                        <option value="ipapi2">ipapi.co (Rate limited, may fail)</option>
+                    </select>
+                </div>
+
+                <div class="setting-item">
+                    <label class="setting-label">Display Options</label>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Show Coordinates</div>
+                            <div class="toggle-desc">Display latitude and longitude values</div>
+                        </div>
+                        <div class="toggle-switch active" id="toggle-coords" onclick="toggleSetting('coords')"></div>
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Show ISP Details</div>
+                            <div class="toggle-desc">Display organization, ASN, and carrier info</div>
+                        </div>
+                        <div class="toggle-switch active" id="toggle-isp" onclick="toggleSetting('isp')"></div>
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Auto-save History</div>
+                            <div class="toggle-desc">Keep lookup history in browser memory</div>
+                        </div>
+                        <div class="toggle-switch active" id="toggle-history" onclick="toggleSetting('history')"></div>
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Show External Links</div>
+                            <div class="toggle-desc">Display resource links in results</div>
+                        </div>
+                        <div class="toggle-switch active" id="toggle-links" onclick="toggleSetting('links')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label class="setting-label">Interface Theme</label>
+                    <div class="setting-desc">Select the visual color scheme</div>
+                    <select class="setting-select" id="setting-theme">
+                        <option value="dark">Deep Dark (Default)</option>
+                        <option value="darker">Midnight</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="toggleSettings()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ============================================================
+           STATE & CONFIG
+           ============================================================ */
+        let currentData = null;
+        let currentTab = 'ip';
+        let history = [];
+        let settings = {
+            api: 'ipapi',
+            showCoords: true,
+            showISP: true,
+            saveHistory: true,
+            showLinks: true,
+            theme: 'dark'
+        };
+
+        /* ============================================================
+           SETTINGS: persistence + UI sync
+           ============================================================ */
+        function loadSettings() {
+            const saved = localStorage.getItem('xtrack_settings');
+            if (saved) {
+                try {
+                    settings = JSON.parse(saved);
+                } catch (e) {
+                    // Ignore corrupt storage, fall back to defaults above.
+                }
+            }
+            applySettings();
+        }
+
+        function applySettings() {
+            document.getElementById('setting-api').value = settings.api;
+            document.getElementById('setting-theme').value = settings.theme;
+            document.getElementById('toggle-coords').classList.toggle('active', settings.showCoords);
+            document.getElementById('toggle-isp').classList.toggle('active', settings.showISP);
+            document.getElementById('toggle-history').classList.toggle('active', settings.saveHistory);
+            document.getElementById('toggle-links').classList.toggle('active', settings.showLinks);
+        }
+
+        function saveSettings() {
+            settings.api = document.getElementById('setting-api').value;
+            settings.theme = document.getElementById('setting-theme').value;
+            localStorage.setItem('xtrack_settings', JSON.stringify(settings));
+            toggleSettings();
+            setStatus('success', 'Settings saved');
+        }
+
+        function toggleSetting(key) {
+            if (key === 'coords') settings.showCoords = !settings.showCoords;
+            if (key === 'isp') settings.showISP = !settings.showISP;
+            if (key === 'history') settings.saveHistory = !settings.saveHistory;
+            if (key === 'links') settings.showLinks = !settings.showLinks;
+            applySettings();
+        }
+
+        /* ============================================================
+           PANEL TOGGLES (settings modal, history drawer)
+           ============================================================ */
+        function toggleSettings() {
+            document.getElementById('settings-modal').classList.toggle('active');
+        }
+
+        function closeSettings(e) {
+            if (e.target === document.getElementById('settings-modal')) {
+                toggleSettings();
+            }
+        }
+
+        function toggleHistory() {
+            document.getElementById('history-panel').classList.toggle('active');
+        }
+
+        /* ============================================================
+           TAB NAVIGATION
+           ============================================================ */
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+
+            document.getElementById('panel-ip').style.display = tab === 'ip' ? 'block' : 'none';
+            document.getElementById('panel-email').style.display = tab === 'email' ? 'block' : 'none';
+            document.getElementById('panel-phone').style.display = tab === 'phone' ? 'block' : 'none';
+
+            showResults(false);
+        }
+
+        /* ============================================================
+           STATUS / ERROR / LOADING FEEDBACK
+           ============================================================ */
+        function setStatus(status, msg) {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            dot.className = 'status-dot';
+            if (status === 'error') dot.classList.add('error');
+            if (status === 'warn') dot.classList.add('warn');
+            text.textContent = msg;
+        }
+
+        function showError(msg) {
+            const box = document.getElementById('error-box');
+            document.getElementById('error-msg').textContent = msg;
+            box.classList.add('active');
+            setStatus('error', 'Failed');
+            setTimeout(() => box.classList.remove('active'), 6000);
+        }
+
+        function setLoading(active) {
+            document.getElementById('loading-box').classList.toggle('active', active);
+        }
+
+        function showResults(active) {
+            document.getElementById('results-box').classList.toggle('active', active);
+            document.getElementById('empty-state').style.display = active ? 'none' : 'block';
+        }
+
+        /* ============================================================
+           SHARED RENDER HELPER
+           ============================================================ */
+        function createCard(label, value, type = 'normal') {
+            const div = document.createElement('div');
+            div.className = 'data-card';
+            let valueClass = 'data-value';
+            if (type === 'mono') valueClass += ' mono';
+            if (type === 'success') valueClass += ' success';
+            if (type === 'danger') valueClass += ' danger';
+            if (type === 'warn') valueClass += ' warn';
+            if (type === 'info') valueClass += ' info';
+
+            div.innerHTML = `
+                <div class="data-label">${label}</div>
+                <div class="${valueClass}">${value !== null && value !== undefined && value !== '' ? value : '-'}</div>
+            `;
+            return div;
+        }
+
+        /* ============================================================
+           IP TRACKER: input helpers + fetch + render
+           ============================================================ */
+        function setIP(ip) {
+            document.getElementById('ip-input').value = ip;
+        }
+
+        async function trackIP() {
+            const input = document.getElementById('ip-input').value.trim();
+            if (!input) {
+                showError('Please enter an IP address or domain');
+                return;
+            }
+            await fetchIPData(input);
+        }
+
+        async function trackMyIP() {
+            document.getElementById('ip-input').value = '';
+            await fetchIPData('');
+        }
+
+        async function fetchIPData(query) {
+            setLoading(true);
+            showResults(false);
+            document.getElementById('error-box').classList.remove('active');
+            setStatus('warn', 'Looking up...');
+
+            try {
+                let url;
+                if (settings.api === 'ipapi2') {
+                    url = query ? `https://ipapi.co/${query}/json/` : 'https://ipapi.co/json/';
+                } else {
+                    const fields = 'status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,reverse,mobile,proxy,hosting,query';
+                    url = query
+                        ? `http://ip-api.com/json/${query}?fields=${fields}`
+                        : `http://ip-api.com/json/?fields=${fields}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.status === 'fail' || data.error) {
+                    throw new Error(data.message || data.reason || 'Lookup failed');
+                }
+
+                currentData = data;
+                renderIPData(data);
+                showResults(true);
+                setStatus('success', 'Complete');
+
+                if (settings.saveHistory) {
+                    addToHistory(data.query || data.ip, 'ip');
+                }
+            } catch (err) {
+                console.error(err);
+                showError(err.message || 'Network error. Try switching API in Settings (S) to ip-api.com.');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function renderIPData(d) {
+            const ip = d.query || d.ip;
+            document.getElementById('result-target').textContent = ip;
+
+            // -- Location grid --
+            const locGrid = document.getElementById('location-grid');
+            locGrid.innerHTML = '';
+            locGrid.appendChild(createCard('Continent', `${d.continent || '-'} (${d.continentCode || '-'})`));
+            locGrid.appendChild(createCard('Country', `${d.country || '-'} (${d.countryCode || '-'})`));
+            locGrid.appendChild(createCard('Region', d.regionName || d.region));
+            locGrid.appendChild(createCard('City', d.city));
+            locGrid.appendChild(createCard('District', d.district));
+            locGrid.appendChild(createCard('ZIP Code', d.zip || d.postal));
+            if (settings.showCoords) {
+                locGrid.appendChild(createCard('Latitude', d.lat, 'mono'));
+                locGrid.appendChild(createCard('Longitude', d.lon, 'mono'));
+            }
+            locGrid.appendChild(createCard('Timezone', d.timezone));
+            locGrid.appendChild(createCard('UTC Offset', d.offset !== undefined ? `UTC${d.offset >= 0 ? '+' : ''}${d.offset / 3600}h` : '-'));
+            locGrid.appendChild(createCard('Currency', d.currency));
+
+            // -- Network & ISP grid --
+            const netGrid = document.getElementById('network-grid');
+            netGrid.innerHTML = '';
+            if (settings.showISP) {
+                netGrid.appendChild(createCard('ISP', d.isp, 'mono'));
+                netGrid.appendChild(createCard('Organization', d.org));
+                netGrid.appendChild(createCard('ASN', d.as || d.asn, 'mono'));
+                netGrid.appendChild(createCard('ASN Name', d.asname));
+            }
+            netGrid.appendChild(createCard('Reverse DNS', d.reverse));
+            netGrid.appendChild(createCard('Mobile', d.mobile ? 'Yes' : 'No', d.mobile ? 'warn' : 'success'));
+            netGrid.appendChild(createCard('Proxy', d.proxy ? 'Yes' : 'No', d.proxy ? 'danger' : 'success'));
+            netGrid.appendChild(createCard('Hosting / DC', d.hosting ? 'Yes' : 'No', d.hosting ? 'warn' : 'success'));
+
+            // -- Geography grid --
+            const geoGrid = document.getElementById('geo-grid');
+            geoGrid.innerHTML = '';
+            geoGrid.appendChild(createCard('Country Code', d.countryCode, 'mono'));
+            geoGrid.appendChild(createCard('Region Code', d.region));
+            geoGrid.appendChild(createCard('Current Time', new Date().toLocaleString()));
+
+            // -- External resource links --
+            const linksDiv = document.getElementById('resource-links');
+            linksDiv.innerHTML = '';
+            if (settings.showLinks) {
+                linksDiv.innerHTML = `
+                    <a href="https://www.opentracker.net/feature/ip-tracker/" target="_blank" class="ext-link">OpenTracker</a>
+                    <a href="https://whatismyipaddress.com/ip/${ip}" target="_blank" class="ext-link">WhatIsMyIPAddress</a>
+                    <a href="https://www.virustotal.com/gui/ip-address/${ip}" target="_blank" class="ext-link">VirusTotal</a>
+                    <a href="https://www.abuseipdb.com/check/${ip}" target="_blank" class="ext-link">AbuseIPDB</a>
+                `;
+            }
+
+            document.getElementById('json-output').textContent = JSON.stringify(d, null, 2);
+        }
+
+        /* ============================================================
+           EMAIL LOOKUP: resource links only (no live API)
+           ============================================================ */
+        function lookupEmail() {
+            const email = document.getElementById('email-input').value.trim();
+            if (!email || !email.includes('@')) {
+                showError('Please enter a valid email address');
+                return;
+            }
+
+            const data = {
+                type: 'email',
+                email: email,
+                timestamp: new Date().toISOString(),
+                tools: [
+                    { name: 'Have I Been Pwned', url: 'https://haveibeenpwned.com/' },
+                    { name: 'EmailRep', url: 'https://emailrep.io/' },
+                    { name: 'WhatIsMyIPAddress Email Trace', url: 'https://whatismyipaddress.com/trace-email' }
+                ],
+                note: 'Email lookup requires external services. X-TRACK provides direct links to trusted platforms.'
+            };
+
+            currentData = data;
+            renderGenericData(data, email, 'email');
+            showResults(true);
+            setStatus('success', 'Email resources loaded');
+
+            if (settings.saveHistory) {
+                addToHistory(email, 'email');
+            }
+        }
+
+        /* ============================================================
+           PHONE LOOKUP: resource links only (no live API)
+           ============================================================ */
+        function lookupPhone() {
+            const phone = document.getElementById('phone-input').value.trim();
+            if (!phone || phone.length < 7) {
+                showError('Please enter a valid phone number');
+                return;
+            }
+
+            const data = {
+                type: 'phone',
+                phone: phone,
+                timestamp: new Date().toISOString(),
+                tools: [
+                    { name: 'Whitepages Reverse Phone', url: 'https://www.whitepages.com/reverse_phone' },
+                    { name: 'NumLookup', url: 'https://www.numlookup.com/' },
+                    { name: 'WhatIsMyIPAddress', url: 'https://whatismyipaddress.com/' }
+                ],
+                note: 'Phone lookup requires external services. X-TRACK provides direct links to trusted platforms.'
+            };
+
+            currentData = data;
+            renderGenericData(data, phone, 'phone');
+            showResults(true);
+            setStatus('success', 'Phone resources loaded');
+
+            if (settings.saveHistory) {
+                addToHistory(phone, 'phone');
+            }
+        }
+
+        /* Shared renderer for the email/phone "resource link" results */
+        function renderGenericData(data, target, type) {
+            document.getElementById('result-target').textContent = target;
+
+            document.getElementById('location-grid').innerHTML =
+                createCard('Type', type.toUpperCase()).outerHTML +
+                createCard('Target', target, 'mono').outerHTML +
+                createCard('Timestamp', new Date().toLocaleString()).outerHTML;
+
+            document.getElementById('network-grid').innerHTML =
+                createCard('Status', 'External lookup required', 'warn').outerHTML +
+                createCard('Note', data.note).outerHTML;
+
+            document.getElementById('geo-grid').innerHTML = '';
+
+            const linksDiv = document.getElementById('resource-links');
+            linksDiv.innerHTML = '';
+            if (settings.showLinks && data.tools) {
+                data.tools.forEach(tool => {
+                    const a = document.createElement('a');
+                    a.href = tool.url;
+                    a.target = '_blank';
+                    a.className = 'ext-link';
+                    a.textContent = tool.name;
+                    linksDiv.appendChild(a);
+                });
+            }
+
+            document.getElementById('json-output').textContent = JSON.stringify(data, null, 2);
+        }
+
+        /* ============================================================
+           HISTORY (in-memory, most recent 15 lookups)
+           ============================================================ */
+        function addToHistory(target, type) {
+            const item = { target, type, time: new Date().toLocaleTimeString() };
+            history.unshift(item);
+            if (history.length > 15) history.pop();
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            if (history.length === 0) {
+                list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">No lookups yet</div>';
+                return;
+            }
+            history.forEach(h => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span class="history-ip">${h.target}</span>
+                        <span class="history-type">${h.type}</span>
+                    </div>
+                    <span class="history-time">${h.time}</span>
+                `;
+                div.onclick = () => {
+                    if (h.type === 'ip') {
+                        switchTab('ip');
+                        document.getElementById('ip-input').value = h.target;
+                        trackIP();
+                    } else if (h.type === 'email') {
+                        switchTab('email');
+                        document.getElementById('email-input').value = h.target;
+                        lookupEmail();
+                    } else if (h.type === 'phone') {
+                        switchTab('phone');
+                        document.getElementById('phone-input').value = h.target;
+                        lookupPhone();
+                    }
+                };
+                list.appendChild(div);
+            });
+        }
+
+        /* ============================================================
+           RESULT ACTIONS: map + copy JSON
+           ============================================================ */
+        function openMap() {
+            if (!currentData) return;
+            const lat = currentData.lat;
+            const lon = currentData.lon;
+            if (lat && lon) {
+                window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank');
+            }
+        }
+
+        async function copyJSON() {
+            if (!currentData) return;
+            const json = JSON.stringify(currentData, null, 2);
+
+            try {
+                await navigator.clipboard.writeText(json);
+                const btn = document.getElementById('copy-btn');
+                btn.textContent = 'Copied';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy JSON';
+                    btn.classList.remove('copied');
+                }, 2000);
+            } catch (err) {
+                // Clipboard API unavailable (older browser / insecure context) — fall back.
+                const textarea = document.createElement('textarea');
+                textarea.value = json;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+        }
+
+        /* ============================================================
+           EVENT LISTENERS
+           ============================================================ */
+        document.getElementById('ip-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') trackIP();
+        });
+        document.getElementById('email-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') lookupEmail();
+        });
+        document.getElementById('phone-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') lookupPhone();
+        });
+
+        /* ============================================================
+           INIT
+           ============================================================ */
+        loadSettings();
+        renderHistory();
+    </script>
+</body>
+</html>
